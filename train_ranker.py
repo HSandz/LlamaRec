@@ -1,6 +1,7 @@
 import os
 import torch
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+os.environ['WANDB_DISABLED'] = 'true'  # Disable wandb completely
 
 import argparse
 from datasets import DATASETS
