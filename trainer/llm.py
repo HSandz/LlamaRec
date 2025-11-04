@@ -105,7 +105,7 @@ class LLMTrainer(Trainer):
             bf16=True,
             logging_steps=10,
             optim="paged_adamw_32bit",
-            evaluation_strategy="steps",
+            eval_strategy="steps",
             save_strategy="steps",
             eval_steps=args.lora_val_iterations,
             save_steps=args.lora_val_iterations,
