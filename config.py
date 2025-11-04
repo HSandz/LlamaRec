@@ -70,7 +70,7 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--train_batch_size', type=int, default=64)
 parser.add_argument('--val_batch_size', type=int, default=64)
 parser.add_argument('--test_batch_size', type=int, default=64)
-parser.add_argument('--num_workers', type=int, default=8)
+parser.add_argument('--num_workers', type=int, default=0)
 parser.add_argument('--sliding_window_size', type=float, default=1.0)
 parser.add_argument('--negative_sample_size', type=int, default=10)
 

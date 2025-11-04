@@ -22,7 +22,7 @@ class ML100KDataset(AbstractDataset):
 
     @classmethod
     def url(cls):  # as of Sep 2023
-        return 'https://files.grouplens.org/datasets/movielens/ml-latest-small.zip'
+        return 'http://files.grouplens.org/datasets/movielens/ml-100k.zip'
 
     @classmethod
     def zip_file_content_is_folder(cls):
@@ -31,9 +31,9 @@ class ML100KDataset(AbstractDataset):
     @classmethod
     def all_raw_file_names(cls):
         return ['README',
-                'movies.csv',
-                'ratings.csv',
-                'users.csv']
+                'u.data',
+                'u.item',
+                'u.user']
 
     def maybe_download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
@@ -64,7 +64,11 @@ class ML100KDataset(AbstractDataset):
         self.maybe_download_raw_dataset()
         df = self.load_ratings_df()
         meta_raw = self.load_meta_dict()
-        df = df[df['sid'].isin(meta_raw)]  # filter items without meta info
+        # Filter by minimum rating threshold
+        if self.min_rating > 0:
+            df = df[df['rating'] >= self.min_rating]
+        # Filter items without meta info
+        df = df[df['sid'].isin(meta_raw.keys())]
         df = self.filter_triplets(df)
         df, umap, smap = self.densify_index(df)
         train, val, test = self.split_df(df, len(umap))
@@ -80,27 +84,45 @@ class ML100KDataset(AbstractDataset):
 
     def load_ratings_df(self):
         folder_path = self._get_rawdata_folder_path()
-        file_path = folder_path.joinpath('ratings.csv')
-        df = pd.read_csv(file_path)
+        file_path = folder_path.joinpath('u.data')
+        # MovieLens 100K uses tab-separated format: user_id, item_id, rating, timestamp
+        df = pd.read_csv(file_path, sep='\t', header=None)
         df.columns = ['uid', 'sid', 'rating', 'timestamp']
         return df
 
     def load_meta_dict(self):
         folder_path = self._get_rawdata_folder_path()
-        file_path = folder_path.joinpath('movies.csv')
-        df = pd.read_csv(file_path, encoding="ISO-8859-1")
+        file_path = folder_path.joinpath('u.item')
+        # MovieLens 100K u.item format: movie_id | movie_title | release_date | ... (pipe-separated)
+        df = pd.read_csv(file_path, sep='|', header=None, encoding="ISO-8859-1", 
+                         usecols=[0, 1])  # Only read movie_id and title columns
+        df.columns = ['movie_id', 'title']
+        
         meta_dict = {}
         for row in df.itertuples():
-            title = row[2][:-7]  # remove year (optional)
-            year = row[2][-7:]
-
+            movie_id = row.movie_id
+            title_with_year = row.title
+            
+            # Safely extract year and title
+            if len(title_with_year) >= 7 and title_with_year[-6:-1].isdigit():
+                title = title_with_year[:-7].strip()  # Remove year (e.g., " (1995)")
+                year = title_with_year[-7:]
+            else:
+                title = title_with_year.strip()
+                year = ''
+            
+            # Remove other parentheses content
             title = re.sub('\(.*?\)', '', title).strip()
-            # the rest articles and parentheses are not considered here
-            if any(', '+x in title.lower()[-5:] for x in ['a', 'an', 'the']):
-                title_pre = title.split(', ')[:-1]
-                title_post = title.split(', ')[-1]
-                title_pre = ', '.join(title_pre)
-                title = title_post + ' ' + title_pre
-
-            meta_dict[row[1]] = title + year
+            
+            # Move articles (a, an, the) from end to beginning
+            # Example: "Shawshank Redemption, The" -> "The Shawshank Redemption"
+            if len(title) > 5 and any(', '+x in title.lower()[-5:] for x in ['a', 'an', 'the']):
+                title_parts = title.split(', ')
+                if len(title_parts) >= 2:
+                    title_pre = ', '.join(title_parts[:-1])
+                    title_post = title_parts[-1]
+                    title = title_post + ' ' + title_pre
+            
+            meta_dict[movie_id] = title + year
+        
         return meta_dict
