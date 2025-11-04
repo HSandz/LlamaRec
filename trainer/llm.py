@@ -119,9 +119,17 @@ class LLMTrainer(Trainer):
             metric_for_best_model=args.rerank_best_metric,
             greater_is_better=True,
         )
+        
+        # Create dummy datasets to satisfy Trainer validation
+        # The actual data loading is handled by custom dataloaders
+        dummy_train_dataset = list(range(len(train_loader.dataset))) if hasattr(train_loader, 'dataset') else [0]
+        dummy_eval_dataset = list(range(len(val_loader.dataset))) if hasattr(val_loader, 'dataset') else [0]
+        
         super().__init__(
             model=model,
             args=hf_args,
+            train_dataset=dummy_train_dataset,
+            eval_dataset=dummy_eval_dataset,
             callbacks=[EarlyStoppingCallback(args.lora_early_stopping_patience)],
             **kwargs)  # hf_args is now args
 
