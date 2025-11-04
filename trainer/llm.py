@@ -114,8 +114,8 @@ class LLMTrainer(Trainer):
             load_best_model_at_end=True,
             ddp_find_unused_parameters=None,
             group_by_length=False,
-            report_to="wandb" if use_wandb else None,
-            run_name=args.model_code+'_'+args.dataset_code if use_wandb else None,
+            report_to=None,  # Disable wandb completely
+            run_name=None,
             metric_for_best_model=args.rerank_best_metric,
             greater_is_better=True,
         )
