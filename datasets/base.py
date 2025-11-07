@@ -102,7 +102,7 @@ class AbstractDataset(metaclass=ABCMeta):
         
         user_group = df.groupby('uid')
         user2items = user_group.progress_apply(
-            lambda d: list(d.sort_values(by=['timestamp', '_original_index'])['sid']))
+            lambda d: list(d.sort_values(by=['timestamp', '_original_index'], kind='mergesort')['sid']))
         train, val, test = {}, {}, {}
         for i in range(user_count):
             user = i + 1
