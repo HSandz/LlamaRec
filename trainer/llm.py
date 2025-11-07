@@ -122,8 +122,15 @@ class LLMTrainer(Trainer):
         
         # Create dummy datasets to satisfy Trainer validation
         # The actual data loading is handled by custom dataloaders
-        dummy_train_dataset = list(range(len(train_loader.dataset))) if hasattr(train_loader, 'dataset') else [0]
-        dummy_eval_dataset = list(range(len(val_loader.dataset))) if hasattr(val_loader, 'dataset') else [0]
+        try:
+            dummy_train_dataset = list(range(len(train_loader.dataset)))
+        except (AttributeError, TypeError):
+            dummy_train_dataset = list(range(100))  # Fallback to dummy size
+        
+        try:
+            dummy_eval_dataset = list(range(len(val_loader.dataset)))
+        except (AttributeError, TypeError):
+            dummy_eval_dataset = list(range(100))  # Fallback to dummy size
         
         super().__init__(
             model=model,
