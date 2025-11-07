@@ -89,8 +89,9 @@ class AbstractDataset(metaclass=ABCMeta):
     
     def densify_index(self, df):
         print('Densifying index')
-        umap = {u: i for i, u in enumerate(set(df['uid']), start=1)}
-        smap = {s: i for i, s in enumerate(set(df['sid']), start=1)}
+        # Sort to ensure deterministic mapping
+        umap = {u: i for i, u in enumerate(sorted(set(df['uid'])), start=1)}
+        smap = {s: i for i, s in enumerate(sorted(set(df['sid'])), start=1)}
         df['uid'] = df['uid'].map(umap)
         df['sid'] = df['sid'].map(smap)
         return df, umap, smap
