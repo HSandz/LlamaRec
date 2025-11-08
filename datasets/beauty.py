@@ -10,6 +10,7 @@ import os
 
 import gzip
 import json
+import ast
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -23,7 +24,7 @@ class BeautyDataset(AbstractDataset):
 
     @classmethod
     def url(cls):
-        return ['http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/ratings_Beauty.csv',
+        return ['http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Beauty_5.json.gz',
                 'http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/meta_Beauty.json.gz']
 
     @classmethod
@@ -32,7 +33,7 @@ class BeautyDataset(AbstractDataset):
 
     @classmethod
     def all_raw_file_names(cls):
-        return ['beauty.csv', 'beauty_meta.json.gz']
+        return ['beauty_reviews.json.gz', 'beauty_meta.json.gz']
 
     def maybe_download_raw_dataset(self):
         folder_path = self._get_rawdata_folder_path()
@@ -60,11 +61,18 @@ class BeautyDataset(AbstractDataset):
         self.maybe_download_raw_dataset()
         df = self.load_ratings_df()
         meta_raw = self.load_meta_dict()
-        df = df[df['sid'].isin(meta_raw)]  # filter items without meta info
+        # Keep all items (no metadata filter)
         df = self.filter_triplets(df)
         df, umap, smap = self.densify_index(df)
         train, val, test = self.split_df(df, len(umap))
-        meta = {smap[k]: v for k, v in meta_raw.items() if k in smap}
+        # Create metadata with fallback for items without metadata
+        meta = {}
+        for item_id in smap.values():
+            orig_id = [k for k, v in smap.items() if v == item_id][0]
+            if orig_id in meta_raw:
+                meta[item_id] = meta_raw[orig_id]
+            else:
+                meta[item_id] = f"Product_{orig_id[:8]}"
         dataset = {'train': train,
                    'val': val,
                    'test': test,
@@ -77,8 +85,22 @@ class BeautyDataset(AbstractDataset):
     def load_ratings_df(self):
         folder_path = self._get_rawdata_folder_path()
         file_path = folder_path.joinpath(self.all_raw_file_names()[0])
-        df = pd.read_csv(file_path, header=None)
-        df.columns = ['uid', 'sid', 'rating', 'timestamp']
+        
+        data = []
+        with gzip.open(file_path, 'rb') as f:
+            for line in f:
+                try:
+                    review = json.loads(line.decode('utf-8'))
+                except json.JSONDecodeError:
+                    review = ast.literal_eval(line.decode('utf-8'))
+                data.append({
+                    'uid': review['reviewerID'],
+                    'sid': review['asin'],
+                    'rating': review['overall'],
+                    'timestamp': review['unixReviewTime']
+                })
+        
+        df = pd.DataFrame(data)
         return df
     
     def load_meta_dict(self):
@@ -88,7 +110,10 @@ class BeautyDataset(AbstractDataset):
         meta_dict = {}
         with gzip.open(file_path, 'rb') as f:
             for line in f:
-                item = eval(line)
+                try:
+                    item = json.loads(line.decode('utf-8'))
+                except json.JSONDecodeError:
+                    item = ast.literal_eval(line.decode('utf-8'))
                 if 'title' in item and len(item['title']) > 0:
                     meta_dict[item['asin'].strip()] = item['title'].strip()
         

@@ -67,12 +67,18 @@ class ML100KDataset(AbstractDataset):
         # Filter by minimum rating threshold
         if self.min_rating > 0:
             df = df[df['rating'] >= self.min_rating]
-        # Filter items without meta info
-        df = df[df['sid'].isin(meta_raw.keys())]
+        # Keep all items (no metadata filter)
         df = self.filter_triplets(df)
         df, umap, smap = self.densify_index(df)
         train, val, test = self.split_df(df, len(umap))
-        meta = {smap[k]: v for k, v in meta_raw.items() if k in smap}
+        # Create metadata with fallback for items without metadata
+        meta = {}
+        for item_id in smap.values():
+            orig_id = [k for k, v in smap.items() if v == item_id][0]
+            if orig_id in meta_raw:
+                meta[item_id] = meta_raw[orig_id]
+            else:
+                meta[item_id] = f"Movie_{orig_id}"
         dataset = {'train': train,
                    'val': val,
                    'test': test,

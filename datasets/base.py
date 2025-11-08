@@ -22,6 +22,7 @@ class AbstractDataset(metaclass=ABCMeta):
         self.min_sc = args.min_sc
 
         assert self.min_uc >= 2, 'Need at least 2 ratings per user for validation and test'
+        assert self.min_uc == 5 and self.min_sc == 5, 'Must use 5-core filtering (min_uc=5, min_sc=5)'
 
     @classmethod
     @abstractmethod
@@ -64,7 +65,7 @@ class AbstractDataset(metaclass=ABCMeta):
         return dataset
 
     def filter_triplets(self, df):
-        print('Filtering triplets')
+        print('Filtering triplets with 5-core (min_uc=5, min_sc=5)')
         if self.min_sc > 1 or self.min_uc > 1:
             item_sizes = df.groupby('sid').size()
             good_items = item_sizes.index[item_sizes >= self.min_sc]
@@ -85,6 +86,7 @@ class AbstractDataset(metaclass=ABCMeta):
                 good_items = item_sizes.index[item_sizes >= self.min_sc]
                 user_sizes = df.groupby('uid').size()
                 good_users = user_sizes.index[user_sizes >= self.min_uc]
+        print(f'After 5-core: {len(df)} interactions, {df["uid"].nunique()} users, {df["sid"].nunique()} items')
         return df
     
     def densify_index(self, df):

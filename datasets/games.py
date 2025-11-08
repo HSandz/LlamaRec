@@ -10,6 +10,7 @@ import os
 
 import gzip
 import json
+import ast
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -61,11 +62,18 @@ class GamesDataset(AbstractDataset):
         self.maybe_download_raw_dataset()
         df = self.load_ratings_df()
         meta_raw = self.load_meta_dict()
-        df = df[df['sid'].isin(meta_raw)]  # filter items without meta info
+        # Keep all items (no metadata filter)
         df = self.filter_triplets(df)
         df, umap, smap = self.densify_index(df)
         train, val, test = self.split_df(df, len(umap))
-        meta = {smap[k]: v for k, v in meta_raw.items() if k in smap}
+        # Create metadata with fallback for items without metadata
+        meta = {}
+        for item_id in smap.values():
+            orig_id = [k for k, v in smap.items() if v == item_id][0]
+            if orig_id in meta_raw:
+                meta[item_id] = meta_raw[orig_id]
+            else:
+                meta[item_id] = f"Game_{orig_id[:8]}"
         dataset = {'train': train,
                    'val': val,
                    'test': test,
@@ -89,7 +97,10 @@ class GamesDataset(AbstractDataset):
         meta_dict = {}
         with gzip.open(file_path, 'rb') as f:
             for line in f:
-                item = eval(line)
+                try:
+                    item = json.loads(line.decode('utf-8'))
+                except json.JSONDecodeError:
+                    item = ast.literal_eval(line.decode('utf-8'))
                 if 'title' in item and len(item['title']) > 0:
                     meta_dict[item['asin'].strip()] = item['title'].strip()
         
