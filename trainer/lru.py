@@ -47,14 +47,24 @@ class LRUTrainer(BaseTrainer):
         with torch.no_grad():
             print('*************** Generating Candidates for Validation Set ***************')
             tqdm_dataloader = tqdm(self.val_loader)
+            val_dataset = self.val_loader.dataset
             for batch_idx, batch in enumerate(tqdm_dataloader):
                 batch = self.to_device(batch)
                 seqs, labels = batch
         
                 scores = self.model(seqs)[:, -1, :]
                 B, L = seqs.shape
-                for i in range(L):
-                    scores[torch.arange(scores.size(0)), seqs[:, i]] = -1e9
+                
+                # Mask ALL history items for each user, not just items in the truncated sequence
+                for i in range(B):
+                    user_idx = batch_idx * self.val_loader.batch_size + i
+                    if user_idx < len(val_dataset.users):
+                        user_id = val_dataset.users[user_idx]
+                        # Get ALL training items for this user (not just last max_len)
+                        all_history_items = val_dataset.u2seq[user_id]
+                        # Mask all history items
+                        scores[i, all_history_items] = -1e9
+                
                 scores[:, 0] = -1e9  # padding
                 val_probs.extend(scores.tolist())
                 val_labels.extend(labels.view(-1).tolist())
@@ -64,14 +74,24 @@ class LRUTrainer(BaseTrainer):
 
             print('****************** Generating Candidates for Test Set ******************')
             tqdm_dataloader = tqdm(self.test_loader)
+            test_dataset = self.test_loader.dataset
             for batch_idx, batch in enumerate(tqdm_dataloader):
                 batch = self.to_device(batch)
                 seqs, labels = batch
         
                 scores = self.model(seqs)[:, -1, :]
                 B, L = seqs.shape
-                for i in range(L):
-                    scores[torch.arange(scores.size(0)), seqs[:, i]] = -1e9
+                
+                # Mask ALL history items for each user (train + val)
+                for i in range(B):
+                    user_idx = batch_idx * self.test_loader.batch_size + i
+                    if user_idx < len(test_dataset.users):
+                        user_id = test_dataset.users[user_idx]
+                        # Get ALL training + validation items for this user
+                        all_history_items = test_dataset.u2seq[user_id] + test_dataset.u2val[user_id]
+                        # Mask all history items
+                        scores[i, all_history_items] = -1e9
+                
                 scores[:, 0] = -1e9  # padding
                 test_probs.extend(scores.tolist())
                 test_labels.extend(labels.view(-1).tolist())
