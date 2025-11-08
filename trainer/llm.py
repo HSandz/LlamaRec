@@ -118,7 +118,7 @@ class LLMTrainer(Trainer):
             run_name=None,
             metric_for_best_model=args.rerank_best_metric,
             greater_is_better=True,
-            resume_from_checkpoint=args.resume_from_checkpoint,  # Support resume from checkpoint
+            # NOTE: resume_from_checkpoint should be passed to train() method, not here
         )
         
         # Create dummy datasets to satisfy Trainer validation

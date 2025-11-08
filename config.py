@@ -103,7 +103,7 @@ parser.add_argument('--best_metric', type=str, default='Recall@10')
 parser.add_argument('--rerank_best_metric', type=str, default='NDCG@10')
 parser.add_argument('--use_wandb', type=bool, default=False)
 parser.add_argument('--resume_from_checkpoint', type=str, default=None, 
-                    help='Path to checkpoint file to resume training from (e.g., experiments/lru/beauty/models/checkpoint-recent.pth)')
+                    help='Path to HuggingFace checkpoint directory to resume training from (e.g., experiments/Llama-2-7b-hf/beauty/checkpoint-100). Must contain adapter_model.bin for LoRA weights.')
 
 ################
 # Retriever Model
