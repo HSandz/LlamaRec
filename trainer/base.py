@@ -60,12 +60,19 @@ class BaseTrainer(metaclass=ABCMeta):
         self.logger_service = LoggerService(
             self.args, writer, self.val_loggers, self.test_loggers, use_wandb)
         
+        # Load checkpoint if specified
+        self.start_epoch = 0
+        if args.resume_from_checkpoint:
+            self._load_checkpoint(args.resume_from_checkpoint)
+        
         print(args)
 
     def train(self):
         accum_iter = 0
-        self.exit_training = self.validate(0, accum_iter)
-        for epoch in range(self.num_epochs):
+        if self.start_epoch == 0:
+            self.exit_training = self.validate(0, accum_iter)
+        
+        for epoch in range(self.start_epoch, self.num_epochs):
             accum_iter = self.train_one_epoch(epoch, accum_iter)
             if self.args.val_strategy == 'epoch':
                 self.exit_training = self.validate(epoch, accum_iter)  # val after every epoch
@@ -169,6 +176,32 @@ class BaseTrainer(metaclass=ABCMeta):
     
     def clip_gradients(self, limit=1.0):
         nn.utils.clip_grad_norm_(self.model.parameters(), limit)
+    
+    def _load_checkpoint(self, checkpoint_path):
+        """Load model and optimizer state from checkpoint"""
+        if not os.path.exists(checkpoint_path):
+            print(f'Checkpoint not found: {checkpoint_path}')
+            return
+        
+        print(f'Loading checkpoint from: {checkpoint_path}')
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        
+        # Load model state
+        if STATE_DICT_KEY in checkpoint:
+            self.model.load_state_dict(checkpoint[STATE_DICT_KEY])
+            print('Model state loaded successfully')
+        
+        # Load optimizer state
+        if OPTIMIZER_STATE_DICT_KEY in checkpoint:
+            self.optimizer.load_state_dict(checkpoint[OPTIMIZER_STATE_DICT_KEY])
+            print('Optimizer state loaded successfully')
+        
+        # Load epoch
+        if 'epoch' in checkpoint:
+            self.start_epoch = checkpoint['epoch']
+            print(f'Resuming from epoch {self.start_epoch}')
+        
+        print('Checkpoint loaded successfully!')
 
     def _update_meter_set(self, meter_set, metrics):
         for k, v in metrics.items():
