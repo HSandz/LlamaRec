@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import os
 import json
+import calendar
 import pandas as pd
 from tqdm import tqdm
 tqdm.pandas()
@@ -74,10 +75,10 @@ class Yelp2020Dataset(AbstractDataset):
         self.maybe_download_raw_dataset()
         df = self.load_ratings_df()
         
-        # Filter reviews within 2019
-        print('Filtering reviews within 2019...')
-        df = df[(df['timestamp'] >= pd.Timestamp('2019-01-01').timestamp()) & 
-                (df['timestamp'] < pd.Timestamp('2020-01-01').timestamp())]
+        # Filter reviews within 2019 (UTC+0)
+        print('Filtering reviews within 2019 (UTC+0)...')
+        df = df[(df['timestamp'] >= pd.Timestamp('2019-01-01', tz='UTC').timestamp()) & 
+                (df['timestamp'] < pd.Timestamp('2020-01-01', tz='UTC').timestamp())]
         print(f'Reviews within 2019: {len(df):,}')
         print(f'  Users: {df["uid"].nunique():,}, Items: {df["sid"].nunique():,}')
         
@@ -121,7 +122,9 @@ class Yelp2020Dataset(AbstractDataset):
             for line in tqdm(f, desc='Reading reviews'):
                 original_order += 1
                 review = json.loads(line)
-                timestamp = datetime.strptime(review['date'], '%Y-%m-%d %H:%M:%S').timestamp()
+                # Parse as UTC+0 explicitly using calendar.timegm
+                dt = datetime.strptime(review['date'], '%Y-%m-%d %H:%M:%S')
+                timestamp = calendar.timegm(dt.timetuple())
                 
                 reviews.append({
                     'original_order': original_order,  # Track for stable sorting
