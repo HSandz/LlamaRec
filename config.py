@@ -24,7 +24,9 @@ def set_template(args):
 
     if 'llm' in args.model_code: 
         batch = 16 if args.dataset_code == 'ml-100k' else 12
-        args.lora_micro_batch_size = batch
+        # Balance memory and speed: reduce micro batch but keep reasonable gradient accumulation
+        micro_batch = 8 if args.dataset_code == 'ml-100k' else 6
+        args.lora_micro_batch_size = micro_batch
     else: 
         batch = 16 if args.dataset_code == 'ml-100k' else 64
 
