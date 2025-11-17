@@ -93,8 +93,19 @@ class Yelp2020Dataset(AbstractDataset):
         # Load metadata
         meta_raw = self.load_meta_dict()
         
-        # Densify index and split
+        # Sort by original_order for mapping (preserve file order)
+        print('Sorting by original file order for ID mapping...')
+        df = df.sort_values(by='original_order', kind='mergesort').reset_index(drop=True)
+        
+        # Densify index (mapping based on original file order)
         df, umap, smap = self.densify_index(df)
+        
+        # Now sort by timestamp for proper train/val/test split
+        print('Sorting by timestamp for train/val/test split...')
+        df = df.sort_values(by=['timestamp', 'original_order'], ascending=[True, True], kind='mergesort')
+        df = df.drop(columns=['original_order']).reset_index(drop=True)
+        
+        # Split dataset
         train, val, test = self.split_df(df, len(umap))
         
         # Create metadata dict with fallback for missing names
@@ -135,9 +146,8 @@ class Yelp2020Dataset(AbstractDataset):
                 })
         
         df = pd.DataFrame(reviews)
-        # Stable sort by timestamp, then original_order
-        df = df.sort_values(by=['timestamp', 'original_order'], ascending=[True, True], kind='mergesort')
-        df = df.drop(columns=['original_order']).reset_index(drop=True)
+        # Keep original file order for mapping (do NOT sort here)
+        df = df.reset_index(drop=True)
         
         print(f'Total reviews loaded: {len(df):,}')
         return df

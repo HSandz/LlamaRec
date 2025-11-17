@@ -63,8 +63,22 @@ class BeautyDataset(AbstractDataset):
         meta_raw = self.load_meta_dict()
         # Keep all items (no metadata filter)
         df = self.filter_triplets(df)
+        
+        # Sort by original_order for mapping (preserve file order)
+        print('Sorting by original file order for ID mapping...')
+        df = df.sort_values(by='original_order', kind='mergesort').reset_index(drop=True)
+        
+        # Densify index (mapping based on original file order)
         df, umap, smap = self.densify_index(df)
+        
+        # Now sort by timestamp for proper train/val/test split
+        print('Sorting by timestamp for train/val/test split...')
+        df = df.sort_values(by=['timestamp', 'original_order'], ascending=[True, True], kind='mergesort')
+        df = df.drop(columns=['original_order']).reset_index(drop=True)
+        
+        # Split dataset
         train, val, test = self.split_df(df, len(umap))
+        
         # Create metadata with fallback for items without metadata
         meta = {}
         for item_id in smap.values():
@@ -87,13 +101,16 @@ class BeautyDataset(AbstractDataset):
         file_path = folder_path.joinpath(self.all_raw_file_names()[0])
         
         data = []
+        original_order = 0
         with gzip.open(file_path, 'rb') as f:
             for line in f:
+                original_order += 1
                 try:
                     review = json.loads(line.decode('utf-8'))
                 except json.JSONDecodeError:
                     review = ast.literal_eval(line.decode('utf-8'))
                 data.append({
+                    'original_order': original_order,
                     'uid': review['reviewerID'],
                     'sid': review['asin'],
                     'rating': review['overall'],
@@ -101,6 +118,7 @@ class BeautyDataset(AbstractDataset):
                 })
         
         df = pd.DataFrame(data)
+        # Keep original file order (do NOT sort here)
         return df
     
     def load_meta_dict(self):
